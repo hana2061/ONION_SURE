@@ -100,13 +100,27 @@ app.add_middleware(
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
-    response = await call_next(request)
-    duration_ms = round((time.time() - start_time) * 1000, 2)
-    logger.info(
-        f"{request.method} {request.url.path} returned {response.status_code} in {duration_ms}ms"
-    )
-    return response
 
+    try:
+        response = await call_next(request)
+
+        duration_ms = round((time.time() - start_time) * 1000, 2)
+        logger.info(
+            f"{request.method} {request.url.path} returned "
+            f"{response.status_code} in {duration_ms}ms"
+        )
+
+        return response
+
+    except Exception:
+        duration_ms = round((time.time() - start_time) * 1000, 2)
+
+        logger.exception(
+            f"UNHANDLED ERROR: {request.method} "
+            f"{request.url.path} after {duration_ms}ms"
+        )
+
+        raise
 
 # Standardized Validation Error Handler
 @app.exception_handler(RequestValidationError)
