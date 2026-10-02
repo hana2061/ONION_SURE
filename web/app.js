@@ -13,14 +13,14 @@ const STATE = {
 };
 
 const ROLE_LABELS = {
-  SUPER_ADMIN: 'Super Admin',
-  CENTRE_ADMIN: 'Centre Admin',
+  SUPER_ADMIN: 'Admin',
+  CENTRE_ADMIN: 'Admin',
   OPERATOR: 'Operator',
   AUDITOR: 'Auditor',
   INSPECTOR: 'Inspector',
   ADMIN: 'Admin',
-  REVIEWER: 'Reviewer',
-  OFFICER: 'Officer',
+  REVIEWER: 'Inspector',
+  OFFICER: 'Admin',
 };
 
 function normalizeRoleName(role) {
@@ -220,9 +220,44 @@ function setUserUI() {
   const roleEl = document.getElementById('user-role');
   const avatarEl = document.getElementById('user-avatar');
   if (nameEl) nameEl.textContent = name;
-  if (roleEl) roleEl.textContent = ROLE_LABELS[role] || role;
+  if (roleEl) roleEl.textContent = ROLE_LABELS[role] || role.replace(/_/g, ' ');
   if (avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase();
   applyRoleNavigation();
+}
+
+async function loadInspectionOptions() {
+  const selects = ['upload-inspection-id', 'grade-inspection-id'];
+  try {
+    const data = await api('/api/v1/inspections?limit=100');
+    const arr = Array.isArray(data) ? data : (data.items || []);
+    const options = arr.map(i => `<option value="${i.id}">${i.inspection_code || short(i.id)} — ${i.status || 'CAPTURING'}</option>`).join('');
+    selects.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = `<option value="">Select inspection</option>${options}`;
+      if (el.dataset.value) {
+        el.value = el.dataset.value;
+      }
+    });
+  } catch (_) {
+    selects.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = '<option value="">No inspections loaded</option>';
+    });
+  }
+}
+
+async function loadLotSelectionForInspection() {
+  const select = document.getElementById('insp-lot-id');
+  if (!select) return;
+  try {
+    const data = await api('/api/v1/lots?limit=100');
+    const arr = Array.isArray(data) ? data : (data.items || []);
+    select.innerHTML = '<option value="">Select a lot</option>' + arr.map(l => `<option value="${l.id}">${l.lot_number || 'LOT'} — ${l.variety || 'Red Onion'}</option>`).join('');
+  } catch (_) {
+    select.innerHTML = '<option value="">No lots found</option>';
+  }
 }
 
 // ── Navigation ──
@@ -250,6 +285,8 @@ function navigate(view) {
     case 'centres':     loadCentres(); break;
     case 'lots':        loadLots(); break;
     case 'inspections': loadInspections(); break;
+    case 'upload':      loadInspectionOptions(); break;
+    case 'grading':     loadInspectionOptions(); break;
     case 'review':      loadReview(); break;
     case 'reports':     loadReports(); break;
     case 'settings':    loadSettings(); break;
@@ -511,13 +548,15 @@ async function createLot() {
 
 // ── INSPECTIONS ──
 async function loadInspections() {
+  await loadLotSelectionForInspection();
+  await loadInspectionOptions();
   try {
     const data = await api('/api/v1/inspections?limit=100');
     const arr  = Array.isArray(data) ? data : (data.items || []);
     if (!arr.length) { document.getElementById('inspections-table').innerHTML = '<div class="empty-state">No inspections yet.</div>'; return; }
     const rows = arr.map(i => `<tr>
       <td><code class="mono">${i.inspection_code || short(i.id)}</code></td>
-      <td>${short(i.lot_id)}</td>
+      <td>${i.lot_number || short(i.lot_id)}</td>
       <td>${i.sample_size || '—'}</td>
       <td>${fmtDate(i.created_at)}</td>
       <td>${statusBadge(i.status)}</td>
@@ -533,10 +572,14 @@ async function loadInspections() {
 
 async function createInspection() {
   const payload = { lot_id: val('insp-lot-id'), sample_size: parseInt(val('insp-sample-size')) || 10, notes: val('insp-notes') };
-  if (!payload.lot_id) { toast('Lot ID is required', 'error'); return; }
+  if (!payload.lot_id) { toast('Please select a lot before creating the inspection.', 'error'); return; }
   try {
     const r = await api('/api/v1/inspections', { method: 'POST', body: payload });
-    toast('Inspection created! ID: ' + r.id); closeModal('modal-inspection'); loadInspections();
+    toast('Inspection created: ' + (r.inspection_code || r.id)); closeModal('modal-inspection'); await loadInspections(); await loadInspectionOptions();
+    if (r.id) {
+      document.getElementById('grade-inspection-id').value = r.id;
+      document.getElementById('upload-inspection-id').value = r.id;
+    }
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -577,7 +620,7 @@ async function uploadImage() {
   const fileEl = document.getElementById('file-input');
   const resultEl = document.getElementById('upload-result');
 
-  if (!inspId) { toast('Enter an Inspection ID first', 'error'); return; }
+  if (!inspId) { toast('Select an inspection before uploading the image.', 'error'); return; }
   if (!fileEl.files.length) { toast('Select an image first', 'error'); return; }
 
   const fd = new FormData();
@@ -601,9 +644,20 @@ async function uploadImage() {
 
 // ── GRADING RESULTS ──
 function loadGradingForInsp(id) {
-  document.getElementById('grade-inspection-id').value = id;
+  const gradeSelect = document.getElementById('grade-inspection-id');
+  if (gradeSelect) {
+    gradeSelect.dataset.value = id;
+    gradeSelect.value = id;
+  }
   navigate('grading');
-  loadGradingResults();
+  setTimeout(() => {
+    const refreshed = document.getElementById('grade-inspection-id');
+    if (refreshed) {
+      refreshed.dataset.value = id;
+      refreshed.value = id;
+    }
+    loadGradingResults();
+  }, 50);
 }
 
 async function loadGradingResults() {
@@ -684,14 +738,15 @@ function gradePillClass(d) {
 // ── MANUAL REVIEW ──
 async function loadReview() {
   try {
-    const data = await api('/api/v1/inspections?status=MANUAL_REVIEW&limit=100');
+    const data = await api('/api/v1/inspections?limit=100');
     const arr  = Array.isArray(data) ? data : (data.items || []);
-    if (!arr.length) { document.getElementById('review-table').innerHTML = '<div class="empty-state">✅ No inspections pending manual review.</div>'; return; }
-    const rows = arr.map(i => `<tr>
-      <td><code class="mono">${short(i.id)}</code></td>
-      <td>${short(i.lot_id)}</td>
+    const reviewItems = arr.filter(i => ['REVIEW_REQUIRED', 'MANUAL_REVIEW', 'PENDING_REVIEW'].includes((i.status || '').toUpperCase()));
+    if (!reviewItems.length) { document.getElementById('review-table').innerHTML = '<div class="empty-state">✅ No inspections pending manual review.</div>'; return; }
+    const rows = reviewItems.map(i => `<tr>
+      <td><code class="mono">${i.inspection_code || short(i.id)}</code></td>
+      <td>${i.lot_number || short(i.lot_id)}</td>
       <td>${fmtDate(i.created_at)}</td>
-      <td>${statusBadge('review')}</td>
+      <td>${statusBadge(i.status)}</td>
       <td><button class="btn btn-sm btn-primary" onclick="loadGradingForInsp('${i.id}')">Review</button></td>
     </tr>`).join('');
     document.getElementById('review-table').innerHTML =
@@ -820,16 +875,17 @@ function errRow(e) { return `<div class="empty-state" style="color:var(--red)">�
 
 function statusBadge(s) {
   if (!s) return '<span class="status status-pending">—</span>';
+  const normalized = String(s).toUpperCase();
   const cls = {
-    active: 'status-active', COMPLETED: 'status-completed', completed: 'status-completed',
-    PENDING: 'status-pending', pending: 'status-pending',
-    MANUAL_REVIEW: 'status-review', review: 'status-review',
+    ACTIVE: 'status-active', COMPLETED: 'status-completed',
+    PENDING: 'status-pending', PENDING_REVIEW: 'status-review',
+    REVIEW_REQUIRED: 'status-review', MANUAL_REVIEW: 'status-review', REVIEW: 'status-review',
     ACCEPT_GRADE_A: 'status-grade-a', 'GRADE A': 'status-grade-a',
     ACCEPT_URS: 'status-urs', URS: 'status-urs',
-    REJECT_LOT: 'status-reject', REJECTED: 'status-reject', reject: 'status-reject',
+    REJECT_LOT: 'status-reject', REJECTED: 'status-reject', REJECT: 'status-reject',
   };
-  const c = cls[s] || 'status-pending';
-  return `<span class="status ${c}">${s.replace(/_/g,' ')}</span>`;
+  const c = cls[normalized] || 'status-pending';
+  return `<span class="status ${c}">${String(s).replace(/_/g,' ')}</span>`;
 }
 
 // ── Init: auto-login if token exists ──

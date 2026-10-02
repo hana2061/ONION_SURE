@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from ...database import get_db
 from ...models.entities import (
+    User,
     Inspection,
     InspectionImage,
     OnionDetection,
@@ -41,6 +42,7 @@ from ...services.inspection_service import InspectionService
 from ...services.grading_persistence_service import GradingPersistenceService
 from ...services.report_service import ReportService
 from ...services.storage_service import image_storage_service
+from ...security import get_current_user
 from ...config import settings
 
 router = APIRouter(prefix="/inspections", tags=["Inspections"])
@@ -265,6 +267,25 @@ def evaluate_and_persist_grading(
 def list_inspection_grade_results(inspection_id: str, db: Session = Depends(get_db)):
     """Lists all individual onion grade results and decision traces for an inspection."""
     return db.query(DBGradeResult).filter(DBGradeResult.inspection_id == inspection_id).all()
+
+
+@router.post("/{inspection_id}/demo-grade", response_model=List[GradeResultResponse])
+def run_demo_grade(
+    inspection_id: str,
+    outcome: str = "GRADE_A",
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Runs the deterministic AI demo-mode grading workflow for the given inspection."""
+    try:
+        return InspectionService.run_demo_grading(
+            db=db,
+            inspection_id=inspection_id,
+            demo_outcome=outcome,
+            actor_id=current_user.id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{inspection_id}/manual-review", response_model=ManualReviewResponse)

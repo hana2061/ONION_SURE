@@ -50,6 +50,14 @@ def list_users(
     )
 
 
+@router.get("/me", response_model=UserResponse)
+def get_current_user_profile(
+    current_user: User = Depends(get_current_user),
+):
+    """Returns the currently authenticated user profile."""
+    return current_user
+
+
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(
     user_id: str,
