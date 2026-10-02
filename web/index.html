@@ -345,8 +345,19 @@
   <div class="modal">
     <div class="modal-header"><h3>Create Lot</h3><button class="modal-close" onclick="closeModal('modal-lot')">✕</button></div>
     <div class="form-group"><label>Lot Number</label><input type="text" id="lot-number" placeholder="LOT-NSK-2026-001" /></div>
-    <div class="form-group"><label>Farmer ID</label><input type="text" id="lot-farmer-id" placeholder="Farmer UUID" /></div>
-    <div class="form-group"><label>Centre ID</label><input type="text" id="lot-centre-id" placeholder="Centre UUID" /></div>
+    <div class="form-group">
+      <label>Farmer</label>
+      <select id="lot-farmer-id">
+        <option value="">Select Farmer</option>
+      </select>
+    </div>
+    
+    <div class="form-group">
+      <label>Procurement Centre</label>
+      <select id="lot-centre-id">
+        <option value="">Select Centre</option>
+      </select>
+    </div>
     <div class="form-group"><label>Variety</label><input type="text" id="lot-variety" placeholder="Nashik Red" /></div>
     <div class="form-group"><label>Quantity (kg)</label><input type="number" id="lot-quantity" placeholder="500" /></div>
     <div class="modal-footer"><button class="btn btn-primary" onclick="createLot()">Create Lot</button></div>
