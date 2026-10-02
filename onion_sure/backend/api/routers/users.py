@@ -27,9 +27,9 @@ def list_users(
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RequireRoles("ADMIN")),
+    current_user: User = Depends(RequireRoles("SUPER_ADMIN", "ADMIN", "CENTRE_ADMIN")),
 ):
-    """Lists users with pagination and search filter (Admin only)."""
+    """Lists users with pagination and search filter (admin-level access only)."""
     query = db.query(User)
     if search:
         query = query.filter(
@@ -58,7 +58,9 @@ def get_user(
 ):
     """Retrieves specific user profile."""
     # Allow self or admin
-    if current_user.id != user_id and not any(r.name == "ADMIN" for r in current_user.roles):
+    if current_user.id != user_id and not any(
+        r.name.upper() in {"ADMIN", "SUPER_ADMIN", "CENTRE_ADMIN"} for r in current_user.roles
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access forbidden: cannot view profile of another user",
@@ -75,9 +77,9 @@ def assign_role(
     user_id: str,
     role_name: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RequireRoles("ADMIN")),
+    current_user: User = Depends(RequireRoles("SUPER_ADMIN", "ADMIN", "CENTRE_ADMIN")),
 ):
-    """Assigns an RBAC role to a user (Admin only)."""
+    """Assigns an RBAC role to a user (admin-level access only)."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

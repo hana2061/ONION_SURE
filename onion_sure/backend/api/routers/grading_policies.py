@@ -38,7 +38,7 @@ def list_grading_policies(db: Session = Depends(get_db)):
 def create_grading_policy(
     policy_in: GradingPolicyCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RequireRoles("ADMIN")),
+    current_user: User = Depends(RequireRoles("SUPER_ADMIN", "ADMIN", "CENTRE_ADMIN")),
 ):
     """Registers a new root grading policy (Admin only)."""
     existing = db.query(GradingPolicy).filter(GradingPolicy.code == policy_in.code).first()
@@ -81,7 +81,7 @@ def create_policy_version(
     policy_code: str,
     version_in: GradingPolicyVersionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RequireRoles("ADMIN")),
+    current_user: User = Depends(RequireRoles("SUPER_ADMIN", "ADMIN", "CENTRE_ADMIN")),
 ):
     """Registers an immutable policy version configuration (Admin only)."""
     policy = db.query(GradingPolicy).filter(GradingPolicy.code == policy_code).first()

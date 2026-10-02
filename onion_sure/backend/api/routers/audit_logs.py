@@ -28,7 +28,7 @@ def list_audit_logs(
     entity_type: Optional[str] = None,
     actor_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RequireRoles("ADMIN")),
+    current_user: User = Depends(RequireRoles("SUPER_ADMIN", "ADMIN", "CENTRE_ADMIN")),
 ):
     """
     Retrieves system audit trail with filtering and pagination (Admin only).

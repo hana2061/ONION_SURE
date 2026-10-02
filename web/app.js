@@ -12,6 +12,59 @@ const STATE = {
   user:   JSON.parse(localStorage.getItem('onion_user') || 'null'),
 };
 
+const ROLE_LABELS = {
+  SUPER_ADMIN: 'Super Admin',
+  CENTRE_ADMIN: 'Centre Admin',
+  OPERATOR: 'Operator',
+  AUDITOR: 'Auditor',
+  INSPECTOR: 'Inspector',
+  ADMIN: 'Admin',
+  REVIEWER: 'Reviewer',
+  OFFICER: 'Officer',
+};
+
+function normalizeRoleName(role) {
+  return String(role || '').trim().toUpperCase().replace(/[-\s]+/g, '_');
+}
+
+function getUserRoles(user) {
+  if (!user) return [];
+  const rawRoles = Array.isArray(user.roles) ? user.roles : [user.role || 'OPERATOR'];
+  return rawRoles.map(normalizeRoleName).filter(Boolean);
+}
+
+function getPrimaryRole(user) {
+  const roles = getUserRoles(user);
+  const priority = ['SUPER_ADMIN', 'CENTRE_ADMIN', 'OPERATOR', 'AUDITOR', 'INSPECTOR', 'ADMIN', 'REVIEWER', 'OFFICER'];
+  for (const role of priority) {
+    if (roles.includes(role)) return role;
+  }
+  return roles[0] || 'OPERATOR';
+}
+
+function applyRoleNavigation() {
+  const primaryRole = getPrimaryRole(STATE.user);
+  const allowedByRole = {
+    SUPER_ADMIN: ['dashboard','farmers','centres','lots','inspections','upload','grading','review','reports','verify','settings'],
+    CENTRE_ADMIN: ['dashboard','farmers','centres','lots','inspections','grading','review','reports','verify'],
+    OPERATOR: ['dashboard','farmers','lots','inspections','upload','grading','reports'],
+    AUDITOR: ['dashboard','inspections','review','reports','verify'],
+    INSPECTOR: ['dashboard','inspections','upload','grading','reports','verify'],
+    ADMIN: ['dashboard','farmers','centres','lots','inspections','review','reports','verify','settings'],
+  };
+  const allowed = allowedByRole[primaryRole] || allowedByRole.OPERATOR;
+  document.querySelectorAll('.nav-item').forEach((nav) => {
+    const view = nav.dataset.view;
+    const visible = allowed.includes(view);
+    nav.style.display = visible ? '' : 'none';
+    nav.classList.toggle('hidden-by-role', !visible);
+  });
+  const activeView = document.querySelector('.nav-item:not([style*="display: none"])');
+  if (activeView && !document.querySelector('.nav-item.active:not([style*="display: none"])')) {
+    navigate(activeView.dataset.view);
+  }
+}
+
 // ── API Helper ──
 async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...opts.headers };
@@ -162,13 +215,14 @@ function setUserUI() {
   const u = STATE.user;
   if (!u) return;
   const name = u.full_name || u.email || 'Inspector';
-  const role = (Array.isArray(u.roles) && u.roles.length) ? u.roles[0] : (u.role || 'INSPECTOR');
+  const role = getPrimaryRole(u);
   const nameEl = document.getElementById('user-name');
   const roleEl = document.getElementById('user-role');
   const avatarEl = document.getElementById('user-avatar');
   if (nameEl) nameEl.textContent = name;
-  if (roleEl) roleEl.textContent = role;
+  if (roleEl) roleEl.textContent = ROLE_LABELS[role] || role;
   if (avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase();
+  applyRoleNavigation();
 }
 
 // ── Navigation ──

@@ -29,11 +29,14 @@ def seed_database(db: Session) -> None:
     """Idempotently seeds all core reference data and demo accounts."""
     # 1. Roles
     roles = {
-        "ADMIN": "Administrator with full system privileges",
-        "INSPECTOR": "Quality inspector performing lot assessments",
-        "OFFICER": "Procurement / Mandi nodal officer",
-        "REVIEWER": "Quality assurance reviewer for manual overrides",
+        "SUPER_ADMIN": "System administrator with full privileges",
+        "CENTRE_ADMIN": "Procurement centre administrator",
         "OPERATOR": "Data entry and lot intake operator",
+        "AUDITOR": "Quality assurance reviewer and verifier",
+        "INSPECTOR": "Quality inspector performing lot assessments",
+        "OFFICER": "Procurement / mandi nodal officer",
+        "REVIEWER": "Legacy reviewer alias for manual overrides",
+        "ADMIN": "Legacy administrator alias",
     }
     role_objs = {}
     for r_name, r_desc in roles.items():
@@ -60,11 +63,25 @@ def seed_database(db: Session) -> None:
     # 3. Default Users
     default_users = [
         {
-            "email": "admin@onionsure.gov.in",
+            "email": "superadmin@onionsure.gov.in",
             "full_name": "System Administrator",
+            "password": "Admin@12345",
+            "role": "SUPER_ADMIN",
+            "is_superuser": True,
+        },
+        {
+            "email": "admin@onionsure.gov.in",
+            "full_name": "Legacy Administrator",
             "password": "Admin@12345",
             "role": "ADMIN",
             "is_superuser": True,
+        },
+        {
+            "email": "centreadmin@onionsure.gov.in",
+            "full_name": "Centre Admin",
+            "password": "CentreAdmin@12345",
+            "role": "CENTRE_ADMIN",
+            "is_superuser": False,
         },
         {
             "email": "inspector@onionsure.gov.in",
@@ -81,8 +98,15 @@ def seed_database(db: Session) -> None:
             "is_superuser": False,
         },
         {
-            "email": "reviewer@onionsure.gov.in",
+            "email": "auditor@onionsure.gov.in",
             "full_name": "Quality Audit Reviewer",
+            "password": "Auditor@12345",
+            "role": "AUDITOR",
+            "is_superuser": False,
+        },
+        {
+            "email": "reviewer@onionsure.gov.in",
+            "full_name": "Legacy QA Reviewer",
             "password": "Reviewer@12345",
             "role": "REVIEWER",
             "is_superuser": False,

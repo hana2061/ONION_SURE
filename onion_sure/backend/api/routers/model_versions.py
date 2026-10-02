@@ -30,7 +30,7 @@ def list_model_versions(db: Session = Depends(get_db)):
 def register_model_version(
     model_in: ModelVersionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(RequireRoles("ADMIN")),
+    current_user: User = Depends(RequireRoles("SUPER_ADMIN", "ADMIN", "CENTRE_ADMIN")),
 ):
     """Registers a new trained AI model version for inference traceability (Admin only)."""
     existing = db.query(ModelVersion).filter(ModelVersion.version == model_in.version).first()

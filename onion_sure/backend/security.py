@@ -21,7 +21,35 @@ from .config import settings
 from .database import get_db
 from .models.entities import User, Role
 
+ROLE_ALIASES = {
+    "SUPER_ADMIN": {"SUPER_ADMIN", "ADMIN"},
+    "ADMIN": {"ADMIN", "SUPER_ADMIN"},
+    "CENTRE_ADMIN": {"CENTRE_ADMIN", "OFFICER"},
+    "OPERATOR": {"OPERATOR"},
+    "AUDITOR": {"AUDITOR", "REVIEWER"},
+    "INSPECTOR": {"INSPECTOR"},
+}
+
 security_scheme = HTTPBearer(auto_error=False)
+
+
+def normalize_role_name(role_name: Optional[str]) -> str:
+    if role_name is None:
+        return ""
+    return role_name.strip().upper().replace("-", "_").replace(" ", "_")
+
+
+def expand_role_aliases(role_names: List[str]) -> set[str]:
+    expanded: set[str] = set()
+    for raw_name in role_names:
+        normalized = normalize_role_name(raw_name)
+        if not normalized:
+            continue
+        expanded.add(normalized)
+        for alias_group in ROLE_ALIASES.values():
+            if normalized in alias_group:
+                expanded.update(alias_group)
+    return expanded
 
 
 # ==============================================================================
@@ -163,8 +191,9 @@ class RequireRoles:
         if user.is_superuser:
             return user
 
-        user_role_names = [r.name.upper() for r in user.roles]
-        if not any(r in self.allowed_roles for r in user_role_names):
+        normalized_allowed = expand_role_aliases(self.allowed_roles)
+        user_role_names = expand_role_aliases([r.name for r in user.roles])
+        if not user_role_names & normalized_allowed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Operation requires one of permissions: {', '.join(self.allowed_roles)}",
