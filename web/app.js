@@ -353,8 +353,52 @@ async function createCentre() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+async function loadLotFormOptions() {
+  try {
+    const [farmersData, centresData] = await Promise.all([
+      api('/api/v1/farmers?limit=100'),
+      api('/api/v1/procurement-centres?limit=100')
+    ]);
+
+    const farmers = Array.isArray(farmersData)
+      ? farmersData
+      : (farmersData.items || []);
+
+    const centres = Array.isArray(centresData)
+      ? centresData
+      : (centresData.items || []);
+
+    const farmerSelect = document.getElementById('lot-farmer-id');
+    const centreSelect = document.getElementById('lot-centre-id');
+
+    if (farmerSelect) {
+      farmerSelect.innerHTML =
+        '<option value="">Select Farmer</option>' +
+        farmers.map(f =>
+          `<option value="${f.id}">
+            ${f.name || f.full_name || 'Unknown'} — ${f.farmer_code || short(f.id)}
+          </option>`
+        ).join('');
+    }
+
+    if (centreSelect) {
+      centreSelect.innerHTML =
+        '<option value="">Select Centre</option>' +
+        centres.map(c =>
+          `<option value="${c.id}">
+            ${c.name || 'Unknown'} — ${c.centre_code || short(c.id)}
+          </option>`
+        ).join('');
+    }
+
+  } catch (e) {
+    toast('Could not load farmers or centres', 'error');
+  }
+}
 // ── LOTS ──
 async function loadLots() {
+  await loadLotFormOptions();
+
   try {
     const data = await api('/api/v1/lots?limit=100');
     const arr  = Array.isArray(data) ? data : (data.items || []);
